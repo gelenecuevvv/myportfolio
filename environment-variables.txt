@@ -1,0 +1,34 @@
+# Environment Variables for Netlify Deployment
+
+Add these environment variables in your Netlify dashboard:
+Site Settings > Environment Variables
+
+## Required Variables:
+
+SUPABASE_URL=your-supabase-project-url
+SUPABASE_ANON_KEY=your-supabase-anon-key
+ADMIN_API_KEY=your-secure-admin-api-key
+
+## Optional Variables (for email notifications):
+
+SENDGRID_API_KEY=your-sendgrid-api-key
+MAILGUN_API_KEY=your-mailgun-api-key
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your-email@gmail.com
+SMTP_PASS=your-email-password
+
+## How to get these values:
+
+1. SUPABASE_URL & SUPABASE_ANON_KEY:
+   - Go to your Supabase project dashboard
+   - Navigate to Settings > API
+   - Copy the Project URL and Public anon key
+
+2. ADMIN_API_KEY:
+   - Generate a secure random string (at least 32 characters)
+   - You can use: https://www.random.org/strings/ or similar
+
+3. Email service keys:
+   - Sign up for SendGrid, Mailgun, or use SMTP
+   - Get your API keys from their respective dashboards 

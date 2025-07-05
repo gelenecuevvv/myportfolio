@@ -1,0 +1,26 @@
+{
+  "name": "portfolio-netlify",
+  "version": "1.0.0",
+  "description": "Portfolio website with Netlify Functions backend",
+  "main": "index.html",
+  "scripts": {
+    "dev": "netlify dev",
+    "build": "echo 'No build step needed for static files'",
+    "start": "netlify dev"
+  },
+  "dependencies": {
+    "@netlify/neon": "^0.1.0",
+    "@supabase/supabase-js": "^2.39.0"
+  },
+  "devDependencies": {
+    "netlify-cli": "^17.10.1"
+  },
+  "keywords": [
+    "portfolio",
+    "netlify",
+    "serverless",
+    "javascript"
+  ],
+  "author": "Marie Angelene",
+  "license": "MIT"
+}
