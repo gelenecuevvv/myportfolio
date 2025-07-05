@@ -1,20 +1,18 @@
-const { createClient } = require('@supabase/supabase-js');
-
-// Initialize Supabase client
-const supabase = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_ANON_KEY
-);
+const { Pool } = require('pg');
 
 class Database {
     constructor() {
-        this.supabase = supabase;
+        this.pool = new Pool({
+            connectionString: process.env.NETLIFY_DATABASE_URL,
+            ssl: { rejectUnauthorized: false }
+        });
     }
 
     async testConnection() {
         try {
-            const { data, error } = await this.supabase.from('contacts').select('count', { count: 'exact' });
-            if (error) throw error;
+            const client = await this.pool.connect();
+            await client.query('SELECT 1');
+            client.release();
             return { success: true, message: 'Database connected successfully' };
         } catch (error) {
             return { success: false, error: error.message };
@@ -23,13 +21,24 @@ class Database {
 
     async createContact(contactData) {
         try {
-            const { data, error } = await this.supabase
-                .from('contacts')
-                .insert([contactData])
-                .select();
+            const client = await this.pool.connect();
+            const query = `
+                INSERT INTO contacts (name, email, message, ip_address, status, submitted_at)
+                VALUES ($1, $2, $3, $4, $5, $6)
+                RETURNING *
+            `;
+            const values = [
+                contactData.name,
+                contactData.email,
+                contactData.message,
+                contactData.ip_address,
+                contactData.status || 'new',
+                contactData.submitted_at
+            ];
             
-            if (error) throw error;
-            return { success: true, data: data[0] };
+            const result = await client.query(query, values);
+            client.release();
+            return { success: true, data: result.rows[0] };
         } catch (error) {
             return { success: false, error: error.message };
         }
@@ -37,13 +46,11 @@ class Database {
 
     async getAllContacts() {
         try {
-            const { data, error } = await this.supabase
-                .from('contacts')
-                .select('*')
-                .order('submitted_at', { ascending: false });
-            
-            if (error) throw error;
-            return { success: true, data };
+            const client = await this.pool.connect();
+            const query = 'SELECT * FROM contacts ORDER BY submitted_at DESC';
+            const result = await client.query(query);
+            client.release();
+            return { success: true, data: result.rows };
         } catch (error) {
             return { success: false, error: error.message };
         }
@@ -51,14 +58,16 @@ class Database {
 
     async getContactById(id) {
         try {
-            const { data, error } = await this.supabase
-                .from('contacts')
-                .select('*')
-                .eq('id', id)
-                .single();
+            const client = await this.pool.connect();
+            const query = 'SELECT * FROM contacts WHERE id = $1';
+            const result = await client.query(query, [id]);
+            client.release();
             
-            if (error) throw error;
-            return { success: true, data };
+            if (result.rows.length === 0) {
+                return { success: false, error: 'Contact not found' };
+            }
+            
+            return { success: true, data: result.rows[0] };
         } catch (error) {
             return { success: false, error: error.message };
         }
@@ -66,14 +75,16 @@ class Database {
 
     async updateContactStatus(id, status) {
         try {
-            const { data, error } = await this.supabase
-                .from('contacts')
-                .update({ status })
-                .eq('id', id)
-                .select();
+            const client = await this.pool.connect();
+            const query = 'UPDATE contacts SET status = $1 WHERE id = $2 RETURNING *';
+            const result = await client.query(query, [status, id]);
+            client.release();
             
-            if (error) throw error;
-            return { success: true, data: data[0] };
+            if (result.rows.length === 0) {
+                return { success: false, error: 'Contact not found' };
+            }
+            
+            return { success: true, data: result.rows[0] };
         } catch (error) {
             return { success: false, error: error.message };
         }
@@ -81,12 +92,10 @@ class Database {
 
     async deleteContact(id) {
         try {
-            const { error } = await this.supabase
-                .from('contacts')
-                .delete()
-                .eq('id', id);
-            
-            if (error) throw error;
+            const client = await this.pool.connect();
+            const query = 'DELETE FROM contacts WHERE id = $1';
+            const result = await client.query(query, [id]);
+            client.release();
             return { success: true };
         } catch (error) {
             return { success: false, error: error.message };
@@ -95,17 +104,20 @@ class Database {
 
     async checkRateLimit(ipAddress, minutes = 5, maxAttempts = 2) {
         try {
+            const client = await this.pool.connect();
             const timeAgo = new Date();
             timeAgo.setMinutes(timeAgo.getMinutes() - minutes);
             
-            const { data, error } = await this.supabase
-                .from('contacts')
-                .select('id')
-                .eq('ip_address', ipAddress)
-                .gte('submitted_at', timeAgo.toISOString());
+            const query = `
+                SELECT COUNT(*) as count 
+                FROM contacts 
+                WHERE ip_address = $1 AND submitted_at > $2
+            `;
+            const result = await client.query(query, [ipAddress, timeAgo.toISOString()]);
+            client.release();
             
-            if (error) throw error;
-            return { success: true, count: data.length, isBlocked: data.length > maxAttempts };
+            const count = parseInt(result.rows[0].count);
+            return { success: true, count, isBlocked: count > maxAttempts };
         } catch (error) {
             return { success: false, error: error.message };
         }
